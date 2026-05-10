@@ -41,6 +41,17 @@ function fetchBinary(url) {
   });
 }
 
+// HEAD check - returns true if CDN has the image (status 200)
+function cdnImageExists(url) {
+  return new Promise((resolve) => {
+    const req = https.request(url, { method: "HEAD" }, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on("error", () => resolve(false));
+    req.end();
+  });
+}
+
 export default async function handler(req, res) {
   const { appid } = req.query;
 
@@ -52,18 +63,26 @@ export default async function handler(req, res) {
 
   try {
     const json = await fetchJson(`${CORS_PROXY}?appids=${appid}&cc=th`);
-
     const appData = json[appid];
 
     let headerImage;
-    if (!appData?.success) {
-      // Config/non-store apps: fallback to placeholder with appid
-      headerImage = `https://placehold.co/460x215?text=App+${appid}`;
-    } else {
+
+    if (appData?.success) {
+      // Normal case: use Steam's header_image from appdetails
       headerImage = appData.data?.header_image;
       if (!headerImage) {
         const appName = encodeURIComponent(appData.data?.name || appid);
         headerImage = `https://placehold.co/460x215?text=${appName}`;
+      }
+    } else {
+      // Config/non-store app: try CDN directly first
+      const cdnUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`;
+      const exists = await cdnImageExists(cdnUrl);
+      if (exists) {
+        headerImage = cdnUrl;
+      } else {
+        // Final fallback: placeholder with appid
+        headerImage = `https://placehold.co/460x215?text=App+${appid}`;
       }
     }
 
