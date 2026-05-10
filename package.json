@@ -1,0 +1,5 @@
+{
+  "name": "steamimg",
+  "version": "1.0.0",
+  "description": "Returns Steam header image for any app ID"
+}
