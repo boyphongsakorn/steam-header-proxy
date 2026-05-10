@@ -1,8 +1,8 @@
 const https = require("https");
- 
+
 const CORS_PROXY =
   "https://cors-fany.vercel.app/store.steampowered.com/api/appdetails";
- 
+
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
     https
@@ -20,7 +20,7 @@ function fetchJson(url) {
       .on("error", reject);
   });
 }
- 
+
 function fetchBinary(url) {
   return new Promise((resolve, reject) => {
     https
@@ -40,34 +40,35 @@ function fetchBinary(url) {
       .on("error", reject);
   });
 }
- 
+
 export default async function handler(req, res) {
   const { appid } = req.query;
- 
+
   if (!appid || !/^\d+$/.test(appid)) {
     return res
       .status(400)
       .json({ error: "Missing or invalid ?appid= parameter" });
   }
- 
+
   try {
     const json = await fetchJson(`${CORS_PROXY}?appids=${appid}&cc=th`);
- 
+
     const appData = json[appid];
+
+    let headerImage;
     if (!appData?.success) {
-      return res
-        .status(404)
-        .json({ error: "App not found or Steam returned success=false" });
+      // Config/non-store apps: fallback to placeholder with appid
+      headerImage = `https://placehold.co/460x215?text=App+${appid}`;
+    } else {
+      headerImage = appData.data?.header_image;
+      if (!headerImage) {
+        const appName = encodeURIComponent(appData.data?.name || appid);
+        headerImage = `https://placehold.co/460x215?text=${appName}`;
+      }
     }
- 
-    let headerImage = appData.data?.header_image;
-    if (!headerImage) {
-      const appName = encodeURIComponent(appData.data?.name || appid);
-      headerImage = `https://placehold.co/460x215?text=${appName}`;
-    }
- 
+
     const { buffer, contentType } = await fetchBinary(headerImage);
- 
+
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Length", buffer.length);
     res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
